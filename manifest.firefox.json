@@ -6,7 +6,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://sysacad.frt.utn.edu.ar/*"
+        "https://sysacad.frt.utn.edu.ar/*",
+        "https://servicios.fra.utn.edu.ar/*"
       ],
       "css": [
         "style.css"
@@ -22,7 +23,8 @@
         "icons/*"
       ],
       "matches": [
-        "https://sysacad.frt.utn.edu.ar/*"
+        "https://sysacad.frt.utn.edu.ar/*",
+        "https://servicios.fra.utn.edu.ar/*"
       ]
     }
   ],
