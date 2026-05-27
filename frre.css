@@ -902,6 +902,7 @@ html.ms-dark .ms-progress-card {
     border: 1px solid var(--ms-border);
     border-radius: var(--ms-radius-lg);
     padding: 20px;
+    margin-top: 24px;
     animation: ms-fadeInUp .5s ease both;
 }
 
@@ -911,7 +912,72 @@ html.ms-dark .ms-schedule-card {
 }
 
 .ms-schedule-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 16px;
+}
+
+.ms-schedule-head-info {
+    min-width: 0;
+}
+
+.ms-schedule-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--ms-accent) !important;
+    color: #fff !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    border-radius: var(--ms-radius-sm) !important;
+    font-family: var(--ms-font) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    transition: background-color .15s ease;
+    box-shadow: none !important;
+    transform: none !important;
+    flex-shrink: 0;
+    white-space: nowrap;
+    outline: none;
+}
+
+/* Forzar blanco en el span y el SVG (el `.page-generic span` global
+   estaba ganando con color heredado) */
+.ms-schedule-download span,
+.ms-schedule-download svg {
+    color: #fff !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+}
+
+.ms-schedule-download:hover {
+    background: var(--ms-accent-hover) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.ms-schedule-download:active {
+    background: var(--ms-accent-hover) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.ms-schedule-download:focus {
+    outline: none;
+    box-shadow: none !important;
+}
+
+.ms-schedule-download:focus-visible {
+    outline: 2px solid var(--ms-accent);
+    outline-offset: 2px;
+}
+
+.ms-schedule-download svg {
+    flex-shrink: 0;
 }
 
 .ms-schedule-title {
@@ -937,107 +1003,85 @@ html.ms-dark .ms-schedule-card {
     padding: 0 4px;
 }
 
-.ms-schedule-day-headers {
+/* CSS Grid: 1 columna de label de hora + 6 columnas de días.
+   Usamos gap: 1px sobre fondo border-color para crear líneas entre celdas
+   sin tener que manejar bordes per-celda. */
+.ms-schedule-table {
     display: grid;
-    grid-template-columns: 56px repeat(6, minmax(80px, 1fr));
-    border-bottom: 1px solid var(--ms-border-strong);
-    padding-bottom: 10px;
-    margin-bottom: 0;
-    min-width: 540px;
+    border: 1px solid var(--ms-border);
+    border-radius: var(--ms-radius);
+    overflow: hidden;
+    background: var(--ms-border);
+    gap: 1px;
+    min-width: 720px;
 }
 
-.ms-schedule-corner {
-    /* esquina vacía sobre la columna de horas */
+.ms-schedule-corner,
+.ms-schedule-day-name,
+.ms-schedule-time-label,
+.ms-schedule-cell {
+    background: var(--ms-card-bg);
+}
+
+.ms-schedule-corner,
+.ms-schedule-day-name {
+    background: var(--ms-card-bg-elev);
+    padding: 10px 8px;
 }
 
 .ms-schedule-day-name {
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--ms-text-muted);
+    letter-spacing: 0.08em;
+    color: var(--ms-text-secondary);
     text-align: center;
 }
 
-.ms-schedule-body {
-    display: grid;
-    grid-template-columns: 56px 1fr;
-    min-width: 540px;
-    margin-top: 8px;
-}
-
-.ms-schedule-times {
-    position: relative;
-    border-right: 1px solid var(--ms-border);
-}
-
-.ms-schedule-time {
-    position: absolute;
-    right: 10px;
-    transform: translateY(-50%);
-    font-size: 10px;
+.ms-schedule-time-label {
+    padding: 6px 12px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--ms-text-muted);
-    font-variant-numeric: tabular-nums;
+    color: var(--ms-text-secondary);
     background: var(--ms-card-bg-elev);
-    padding: 0 4px;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
 }
 
-html.ms-dark .ms-schedule-time {
-    background: transparent;
-}
-
-/* Primera y última etiqueta: aliñar para que no se claven encima ni debajo
-   del body, pase lo que pase con el rango horario (mañana, siesta, noche) */
-.ms-schedule-time:first-child {
-    transform: translateY(0);
-}
-
-.ms-schedule-time:last-child {
-    transform: translateY(-100%);
-}
-
-.ms-schedule-grid {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(6, minmax(80px, 1fr));
-    background-image: repeating-linear-gradient(
-        to bottom,
-        transparent 0,
-        transparent calc(var(--ms-hour-step) - 1px),
-        var(--ms-border) calc(var(--ms-hour-step) - 1px),
-        var(--ms-border) var(--ms-hour-step)
-    );
-}
-
-.ms-schedule-day {
-    position: relative;
-    border-left: 1px solid var(--ms-border);
-}
-.ms-schedule-day:first-child {
-    border-left: none;
+.ms-schedule-cell {
+    min-height: 44px;
 }
 
 .ms-schedule-block {
-    position: absolute;
-    left: 3px;
-    right: 3px;
-    background: var(--ms-block-bg, var(--ms-accent-soft));
+    /* linear-gradient(color, color) genera una imagen sólida del tinte,
+       apilada sobre var(--ms-card-bg) opaco — oculta las líneas de la grid
+       en el área del bloque. */
+    background:
+        linear-gradient(var(--ms-block-bg, var(--ms-accent-soft)), var(--ms-block-bg, var(--ms-accent-soft))),
+        var(--ms-card-bg);
     border-left: 3px solid var(--ms-block-color, var(--ms-accent));
-    border-radius: 6px;
-    padding: 6px 8px 6px 10px;
+    border-radius: 8px;
+    margin: 3px;
+    padding: 7px 10px;
     overflow: hidden;
     cursor: default;
-    transition: transform .15s ease, box-shadow .2s ease;
+    transition: filter .15s ease;
     z-index: 1;
-    min-height: 28px;
-    backdrop-filter: blur(2px);
+    align-self: stretch;
+    justify-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .ms-schedule-block:hover {
-    transform: translateX(1px);
+    filter: brightness(0.97);
     z-index: 2;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+html.ms-dark .ms-schedule-block:hover {
+    filter: brightness(1.1);
 }
 
 .ms-schedule-block-title {

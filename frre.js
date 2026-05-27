@@ -642,6 +642,37 @@
         viernes: 4, sabado: 5, domingo: 6
     };
 
+    // Slots fijos de FRRe (~45 min con recreos de 5-10 min entre bloques).
+    // Cada slot tiene start/end en minutos desde medianoche.
+    const FRRE_SLOTS = [
+        { start:  7*60 + 45, end:  8*60 + 30 },
+        { start:  8*60 + 30, end:  9*60 + 15 },
+        { start:  9*60 + 15, end: 10*60      },
+        { start: 10*60 + 10, end: 10*60 + 55 },
+        { start: 10*60 + 55, end: 11*60 + 40 },
+        { start: 11*60 + 40, end: 12*60 + 25 },
+        { start: 12*60 + 45, end: 13*60 + 30 },
+        { start: 13*60 + 30, end: 14*60 + 15 },
+        { start: 14*60 + 15, end: 15*60      },
+        { start: 15*60,      end: 15*60 + 45 },
+        { start: 15*60 + 50, end: 16*60 + 35 },
+        { start: 16*60 + 35, end: 17*60 + 20 },
+        { start: 17*60 + 20, end: 18*60 +  5 },
+        { start: 18*60 + 10, end: 18*60 + 55 },
+        { start: 18*60 + 55, end: 19*60 + 40 },
+        { start: 19*60 + 40, end: 20*60 + 25 },
+        { start: 20*60 + 30, end: 21*60 + 15 },
+        { start: 21*60 + 15, end: 22*60      },
+        { start: 22*60,      end: 22*60 + 45 }
+    ];
+
+    // Un slot está "cubierto" por un evento si hay ≥50% de overlap entre ambos.
+    // Esto soporta horarios que arrancan un par de minutos antes/después del slot.
+    function slotCovered(event, slot) {
+        const overlap = Math.max(0, Math.min(slot.end, event.end) - Math.max(slot.start, event.start));
+        return overlap >= (slot.end - slot.start) * 0.5;
+    }
+
     /**
      * Parse strings tipo "Lunes 21:15-22:45, Martes 20:30-22:00".
      * Devuelve array de { dayIdx, start, end } donde start/end son minutos
@@ -672,102 +703,258 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
-    function buildScheduleGrid(rowsData) {
-        const allEvents = [];
+    /**
+     * Descarga los horarios como Excel (.xls) usando el formato "Office HTML":
+     * Excel abre HTML con MIME application/vnd.ms-excel como una planilla
+     * nativa y respeta estilos inline (bg-color, borders, font-weight).
+     *
+     * Estructura: slot × día. Cada materia tiene un color consistente con
+     * la vista web. Solo se incluyen slots con al menos una clase.
+     */
+    function downloadScheduleXLS(rowsData) {
+        const dayCount = 6;
+        const fullDayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+        // Build slot × day grid; cada celda: { label, color } o null
+        const grid = FRRE_SLOTS.map(() => Array(dayCount).fill(null));
         rowsData.forEach((r, i) => {
             const color = SCHEDULE_COLORS[i % SCHEDULE_COLORS.length];
             r.events.forEach(ev => {
-                allEvents.push({ ...ev, materia: r.materia, comision: r.comision, color });
+                if (ev.dayIdx >= dayCount) return;
+                const label = r.comision ? `${r.materia} (${r.comision})` : r.materia;
+                FRRE_SLOTS.forEach((s, idx) => {
+                    if (slotCovered(ev, s)) grid[idx][ev.dayIdx] = { label, color };
+                });
             });
         });
-        if (allEvents.length === 0) return null;
 
-        // Rango de horas: redondeo al hour boundary para grilla limpia
-        let minHour = 24, maxHour = 0;
-        allEvents.forEach(e => {
-            minHour = Math.min(minHour, Math.floor(e.start / 60));
-            maxHour = Math.max(maxHour, Math.ceil(e.end / 60));
+        const usedRows = grid
+            .map((row, i) => row.some(c => c) ? i : -1)
+            .filter(i => i >= 0);
+        if (usedRows.length === 0) return;
+
+        const esc = s => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        // Mezcla un hex con blanco para conseguir un tinte pastel opaco
+        // (Excel no maneja alpha en colores HTML)
+        const softHex = (hex, mix = 0.22) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const blend = c => Math.round(c * mix + 255 * (1 - mix));
+            const h = c => blend(c).toString(16).padStart(2, '0');
+            return `#${h(r)}${h(g)}${h(b)}`;
+        };
+
+        let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<!--[if gte mso 9]><xml>
+  <x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+    <x:Name>Agenda Semanal</x:Name>
+    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+  </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>
+</xml><![endif]-->
+<style>
+  table { border-collapse: collapse; font-family: Arial, sans-serif; }
+  th, td { border: 1px solid #cccccc; padding: 8px 10px; vertical-align: middle; text-align: center; font-size: 11pt; font-family: Arial, sans-serif; }
+  th { background: #4f63d0; color: #ffffff; font-weight: 700; }
+  th.time, td.time { background: #f3f4f6; color: #475569; font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+<table>
+<thead>
+<tr>
+  <th class="time">Horario</th>`;
+        fullDayNames.forEach(name => {
+            html += `<th>${esc(name)}</th>`;
         });
-        minHour = Math.max(0, minHour);
-        maxHour = Math.min(24, maxHour);
-        const totalHours = maxHour - minHour;
-        const totalMinutes = totalHours * 60;
-        if (totalMinutes <= 0) return null;
+        html += `</tr></thead><tbody>`;
 
+        // Matriz para tracking de celdas absorbidas por rowspan de filas anteriores
+        const skip = usedRows.map(() => Array(dayCount).fill(false));
+
+        usedRows.forEach((slotIdx, visIdx) => {
+            const slot = FRRE_SLOTS[slotIdx];
+            const label = `${formatMinutes(slot.start)} a ${formatMinutes(slot.end)}`;
+            html += `<tr><td class="time">${esc(label)}</td>`;
+            for (let d = 0; d < dayCount; d++) {
+                if (skip[visIdx][d]) continue; // celda absorbida por rowspan
+                const cell = grid[slotIdx][d];
+                if (cell) {
+                    // Cuántas filas siguientes tienen la misma materia en esta columna
+                    let span = 1;
+                    for (let next = visIdx + 1; next < usedRows.length; next++) {
+                        const nextCell = grid[usedRows[next]][d];
+                        if (nextCell && nextCell.label === cell.label) {
+                            span++;
+                            skip[next][d] = true;
+                        } else {
+                            break;
+                        }
+                    }
+                    const rowspanAttr = span > 1 ? ` rowspan="${span}"` : '';
+                    const bg = softHex(cell.color);
+                    html += `<td${rowspanAttr} style="background:${bg};border-left:3px solid ${cell.color};font-weight:normal;color:#0f172a;vertical-align:middle;text-align:center;font-family:Arial,sans-serif;">${esc(cell.label)}</td>`;
+                } else {
+                    html += `<td></td>`;
+                }
+            }
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table></body></html>`;
+
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'horarios-cursado.xls';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+
+    function buildScheduleGrid(rowsData) {
+        const dayCount = 6; // Lun-Sáb
         const dayNames = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-        const dayCount = 6; // Lun-Sáb (omito Domingo)
+
+        // Para cada evento, calcular el rango de slots que cubre
+        const blocks = [];
+        rowsData.forEach((r, i) => {
+            const color = SCHEDULE_COLORS[i % SCHEDULE_COLORS.length];
+            r.events.forEach(ev => {
+                if (ev.dayIdx >= dayCount) return;
+                const covered = FRRE_SLOTS
+                    .map((s, idx) => slotCovered(ev, s) ? idx : -1)
+                    .filter(idx => idx >= 0);
+                if (covered.length === 0) return;
+                blocks.push({
+                    dayIdx: ev.dayIdx,
+                    slotStart: covered[0],
+                    slotEnd: covered[covered.length - 1],
+                    start: ev.start,
+                    end: ev.end,
+                    materia: r.materia,
+                    comision: r.comision,
+                    color
+                });
+            });
+        });
+
+        if (blocks.length === 0) return null;
+
+        // Slots visibles: los que tienen al menos un bloque que los cubre
+        const usedSet = new Set();
+        blocks.forEach(b => {
+            for (let i = b.slotStart; i <= b.slotEnd; i++) usedSet.add(i);
+        });
+        const visibleSlots = [...usedSet].sort((a, b) => a - b);
+        const slotIdxToRow = new Map();
+        visibleSlots.forEach((origIdx, i) => slotIdxToRow.set(origIdx, i));
 
         const card = el('div', { className: 'ms-schedule-card' });
 
-        card.appendChild(el('div', {
+        // Header con título + botón de descarga
+        const head = el('div', {
             className: 'ms-schedule-head',
             html: `
-                <div class="ms-schedule-title">Tu semana</div>
-                <div class="ms-schedule-subtitle">Horarios de cursado actuales</div>
+                <div class="ms-schedule-head-info">
+                    <div class="ms-schedule-title">Tu semana</div>
+                    <div class="ms-schedule-subtitle">Horarios de cursado actuales</div>
+                </div>
             `
-        }));
+        });
+        const downloadBtn = el('button', {
+            className: 'ms-schedule-download',
+            attrs: { type: 'button', title: 'Descargar agenda semanal como Excel/CSV' },
+            html: `
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Excel</span>
+            `
+        });
+        downloadBtn.addEventListener('click', () => downloadScheduleXLS(rowsData));
+        head.appendChild(downloadBtn);
+        card.appendChild(head);
 
-        // Inner wrapper que sí scrollea horizontalmente en mobile
+        // Wrapper con scroll horizontal en mobile
         const wrap = el('div', { className: 'ms-schedule-wrap' });
 
-        // Day headers
-        const dayHeaders = el('div', { className: 'ms-schedule-day-headers' });
-        dayHeaders.appendChild(el('div', { className: 'ms-schedule-corner' }));
-        for (let i = 0; i < dayCount; i++) {
-            dayHeaders.appendChild(el('div', { className: 'ms-schedule-day-name', text: dayNames[i] }));
-        }
-        wrap.appendChild(dayHeaders);
+        // Grid table — CSS Grid puro: 1 col de horarios + N cols de días,
+        // 1 fila de header + N filas de slots
+        const grid = el('div', { className: 'ms-schedule-table' });
+        grid.style.gridTemplateColumns = `auto repeat(${dayCount}, minmax(110px, 1fr))`;
+        grid.style.gridTemplateRows = `auto repeat(${visibleSlots.length}, minmax(44px, auto))`;
 
-        // Body
-        const body = el('div', { className: 'ms-schedule-body' });
-        body.style.height = `${totalHours * 60}px`; // 60px por hora
+        // IMPORTANTE: damos posición explícita a TODOS los items (no solo a
+        // los bloques). Si dejamos auto-placement para los background cells,
+        // el algoritmo los hace fluir alrededor de los bloques explícitos y
+        // terminan en columnas/filas incorrectas.
 
-        // Time labels column
-        const timesCol = el('div', { className: 'ms-schedule-times' });
-        for (let h = minHour; h <= maxHour; h++) {
-            const label = el('div', {
-                className: 'ms-schedule-time',
-                text: `${String(h).padStart(2, '0')}:00`
-            });
-            const topPct = ((h - minHour) * 60 / totalMinutes) * 100;
-            label.style.top = `${topPct}%`;
-            timesCol.appendChild(label);
-        }
-        body.appendChild(timesCol);
-
-        // Grid con day columns
-        const grid = el('div', { className: 'ms-schedule-grid' });
-        grid.style.gridTemplateColumns = `repeat(${dayCount}, 1fr)`;
-        grid.style.setProperty('--ms-hour-step', `${100 / totalHours}%`);
+        // Fila 1: esquina vacía + headers de días
+        const corner = el('div', { className: 'ms-schedule-corner' });
+        corner.style.gridRow = '1';
+        corner.style.gridColumn = '1';
+        grid.appendChild(corner);
 
         for (let d = 0; d < dayCount; d++) {
-            const dayCol = el('div', { className: 'ms-schedule-day' });
-            const dayEvents = allEvents.filter(e => e.dayIdx === d);
-            dayEvents.forEach(ev => {
-                const topPct = ((ev.start - minHour * 60) / totalMinutes) * 100;
-                const heightPct = ((ev.end - ev.start) / totalMinutes) * 100;
-                const block = el('div', {
-                    className: 'ms-schedule-block',
-                    attrs: {
-                        title: `${ev.materia}${ev.comision ? ' · ' + ev.comision : ''} (${formatMinutes(ev.start)}–${formatMinutes(ev.end)})`
-                    },
-                    html: `
-                        <div class="ms-schedule-block-title">${ev.materia}</div>
-                        <div class="ms-schedule-block-time">${formatMinutes(ev.start)}–${formatMinutes(ev.end)}</div>
-                        ${ev.comision ? `<div class="ms-schedule-block-comision">${ev.comision}</div>` : ''}
-                    `
-                });
-                block.style.top = `${topPct}%`;
-                block.style.height = `${heightPct}%`;
-                block.style.setProperty('--ms-block-color', ev.color);
-                block.style.setProperty('--ms-block-bg', ev.color + '22'); // #RRGGBB + 22 alpha (~13%)
-                dayCol.appendChild(block);
-            });
-            grid.appendChild(dayCol);
+            const h = el('div', { className: 'ms-schedule-day-name', text: dayNames[d] });
+            h.style.gridRow = '1';
+            h.style.gridColumn = String(d + 2);
+            grid.appendChild(h);
         }
 
-        body.appendChild(grid);
-        wrap.appendChild(body);
+        // Filas de slots: label de hora + 6 celdas vacías (bg para mostrar bordes)
+        visibleSlots.forEach((origIdx, visIdx) => {
+            const slot = FRRE_SLOTS[origIdx];
+            const row = String(visIdx + 2);
+
+            const label = el('div', {
+                className: 'ms-schedule-time-label',
+                text: `${formatMinutes(slot.start)} a ${formatMinutes(slot.end)}`
+            });
+            label.style.gridRow = row;
+            label.style.gridColumn = '1';
+            grid.appendChild(label);
+
+            for (let d = 0; d < dayCount; d++) {
+                const cell = el('div', { className: 'ms-schedule-cell' });
+                cell.style.gridRow = row;
+                cell.style.gridColumn = String(d + 2);
+                grid.appendChild(cell);
+            }
+        });
+
+        // Bloques de eventos: posicionados con grid-column/row span sobre las
+        // celdas vacías de fondo
+        blocks.forEach(b => {
+            const rowStart = slotIdxToRow.get(b.slotStart) + 2; // +1 por header, +1 porque grid es 1-indexed
+            const rowEnd = slotIdxToRow.get(b.slotEnd) + 3;     // exclusive end
+            const block = el('div', {
+                className: 'ms-schedule-block',
+                attrs: {
+                    title: `${b.materia}${b.comision ? ' · ' + b.comision : ''} (${formatMinutes(b.start)}–${formatMinutes(b.end)})`
+                },
+                html: `
+                    <div class="ms-schedule-block-title">${b.materia}</div>
+                    <div class="ms-schedule-block-time">${formatMinutes(b.start)}–${formatMinutes(b.end)}</div>
+                    ${b.comision ? `<div class="ms-schedule-block-comision">${b.comision}</div>` : ''}
+                `
+            });
+            block.style.gridColumn = String(b.dayIdx + 2);
+            block.style.gridRow = `${rowStart} / ${rowEnd}`;
+            block.style.setProperty('--ms-block-color', b.color);
+            block.style.setProperty('--ms-block-bg', b.color + '22');
+            grid.appendChild(block);
+        });
+
+        wrap.appendChild(grid);
         card.appendChild(wrap);
 
         return card;
