@@ -333,9 +333,9 @@
                 <div class="ms-credits-section">
                     <div class="ms-credits-label">Colaboradores</div>
                     <ul class="ms-credits-list">
-                        <li>Kobluk, T.</li>
-                        <li>Fidanza, G.</li>
-                        <li>Arduino, L.</li>
+                        <li><a href="https://github.com/tomaskoblukUTN" target="_blank" rel="noopener">Kobluk, T.</a></li>
+                        <li><a href="https://github.com/gonzaFidanza" target="_blank" rel="noopener">Fidanza, G.</a></li>
+                        <li><a href="https://github.com/lorenzoarduinoh" target="_blank" rel="noopener">Arduino, L.</a></li>
                     </ul>
                 </div>
                 <div class="ms-credits-foot">
