@@ -11,10 +11,10 @@
         "https://sysacadweb.frgp.utn.edu.ar/*"
       ],
       "css": [
-        "style.css"
+        "common/common.css"
       ],
       "js": [
-        "content.js"
+        "common/common.js"
       ]
     },
     {
@@ -22,10 +22,10 @@
         "https://sysacadweb.frre.utn.edu.ar/*"
       ],
       "css": [
-        "frre.css"
+        "frre/frre.css"
       ],
       "js": [
-        "frre.js"
+        "frre/frre.js"
       ]
     }
   ],

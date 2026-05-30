@@ -10,17 +10,6 @@ Un Sysacad moderno, limpio y con modo oscuro.
 * ⚡ **Ligero**
 
 ---
-## ¡Ya disponible en Chrome y Firefox!
-
-### 🌐 Chrome Web Store
-https://chromewebstore.google.com/detail/mabcfjnfkmedahekjndbbbnmmlodeccm?utm_source=item-share-cb
-
-### 🦊 Firefox Add-ons
-https://addons.mozilla.org/es-AR/firefox/addon/modernsysacad/
-
- Compatible con navegadores:
-**Chrome · Edge · Brave · Opera · Vivaldi y Firefox** 
-
 
 ## ¡Ya disponible en Chrome y Firefox!
 
@@ -40,7 +29,7 @@ https://addons.mozilla.org/es-AR/firefox/addon/modernsysacad/
 * **FRA** (Avellaneda) - `servicios.fra.utn.edu.ar` *(adaptación por Ignacio Natanael Núñez y Facundo Falcone)*
 * **FRGP** (General Pacheco) - `sysacadweb.frgp.utn.edu.ar` *(adaptación por Facundo Falcone)*
 
-Cada regional usa sus propios archivos (`content.js`/`style.css` para FRT, FRA, FRGP y `frre.js`/`frre.css` para FRRe) y el manifest los inyecta sólo en el dominio correspondiente.
+Cada regional puede usar los archivos comunes (`/common`) y/o propios (`/miRegional`), y el manifest los inyecta sólo en el dominio correspondiente.
 
 ---
 
@@ -80,7 +69,8 @@ Cualquier mejora en los estilos CSS o nuevas funcionalidades en JS son más que 
 
 1. Hacé un **Fork** de este repositorio.
 2. Creá una rama para tu modificación: `git checkout -b feature/MejoraVisual`.
-3. Realizá tus cambios en `style.css` o `content.js` (no modifiques los archivos `.json` a menos que sea necesario).
+3. Realizá tus cambios en `common/common.css` o `common/common.js` si el Sysacad de tu regional corresponde con la estructura común.
+   > **Nota importante:** Evitá en lo posible agregar código condicional para distintas facultades dentro de los archivos de la carpeta `common/`. Si necesitás aplicar cambios muy específicos para tu regional, creá un directorio propio (ej. `frre/`) con sus respectivos archivos JS/CSS y configuralo en el manifest para que no afecte a las demás.
 4. Subí tus cambios: `git commit -m 'Agrega mejoras en la tabla de horarios'`.
 5. Hacé el push: `git push origin feature/MejoraVisual`.
 6. Abrí un **Pull Request** directo a la rama `main` de este repo.
